@@ -1,15 +1,3 @@
-#!/usr/bin/env python3
-# portscan.py -- Windows-only TCP/UDP port scanner.
-#
-# TCP: SYN-скан через Npcap + Scapy.sr() (нужны Npcap + Administrator).
-#      Если Scapy/Npcap/прав нет -- программа завершается с ошибкой.
-# UDP: неблокирующие connected UDP-сокеты + selectors.
-# Guess (-g): HTTP, DNS, ECHO.
-#
-# Install:
-#   pip install scapy
-#   Npcap: https://npcap.com/#download (галочка WinPcap API-compatible Mode)
-
 import argparse
 import os
 import random
@@ -35,7 +23,6 @@ def is_admin() -> bool:
 
 
 def check_npcap_or_die():
-    """Проверяет Scapy + Npcap + права администратора. Иначе -- выход."""
     try:
         import scapy.all as scapy
     except ImportError:
@@ -93,7 +80,7 @@ def is_dns_response(data, txid):
     return rid == txid and bool(flags & 0x8000)
 
 
-# ---- application protocol guessing (HTTP / DNS / ECHO) -----------------
+# ---- protocol guessing (HTTP / DNS / ECHO) -----------------
 
 def guess_tcp_protocol(ip, port, timeout, dns_query, txid):
     # HTTP
@@ -200,14 +187,6 @@ def parse_port_spec(spec):
 # ---- Npcap TCP SYN scan -------------------------------------------------
 
 def tcp_syn_scan_npcap(target_ip, ports, timeout, batch_size):
-    """SYN-скан через Npcap.
-    Scapy.sr() через Npcap:
-      - отправляет SYN-фреймы в сетевой драйвер-;
-      - читает ответы тоже драйвером (pcap_next_ex) -- до того, как
-        Windows TCP-стек получит SYN+ACK и отправит RST;
-      - сопоставляет ответ к запросу по 4-tuple и TCP-флагам.
-    Порты идут пачками по batch_size, чтобы не забить буферы Npcap.
-    """
     from scapy.layers.inet import IP, TCP
     from scapy.sendrecv import sr
     from scapy.config import conf as sconf
@@ -351,7 +330,7 @@ def main():
 
     results = {"tcp": {}, "udp": {}}
 
-    # TCP -- только через Npcap, без fallback.
+    # TCP
     if tcp_ports:
         check_npcap_or_die()
         if args.verbose:
@@ -360,7 +339,7 @@ def main():
         for port, t in r.items():
             results["tcp"][port] = {"time": t, "proto": "-"}
 
-    # UDP -- обычные сокеты, Npcap не требуется.
+    # UDP
     if udp_ports:
         r = udp_scan(target_ip, udp_ports, udp_payload, args.timeout, select_max)
         for port, v in r.items():
